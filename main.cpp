@@ -30,12 +30,28 @@ int main(int argc, char* argv[])
             printf("Failed to load media!\n");
         else
         {
-            // Apply the image.
-            SDL_BlitSurface(gHelloWorld, NULL, gScreenSurface, NULL);
-            // Update the surface.
-            SDL_UpdateWindowSurface(gWindow);
-            // Wait two seconds.
-            SDL_Delay(2000);
+            // Main loop flag.
+            bool quit = false;
+            
+            // Event handler.
+            SDL_Event e;
+
+            // While application is running.
+            while (!quit)
+            {
+                // Handle events on queue.
+                while (SDL_PollEvent(&e) != 0)
+                {
+                    // User requests quit.
+                    if (e.type == SDL_QUIT)
+                        quit = true;
+                }
+
+                // Apply the image.
+                SDL_BlitSurface(gHelloWorld, NULL, gScreenSurface, NULL);
+                // Update the surface.
+                SDL_UpdateWindowSurface(gWindow);
+            }
         }
     }
 
