@@ -4,7 +4,7 @@ INC_DIR = -I"./include"
 LIB_DIR = -L"./lib"
 
 CFLAG = -g -Wall -Wl,-subsystem=windows
-LFLAG = -lmingw32 -lSDL2main -lSDL2
+LFLAG = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image
 
 SRC = main.cpp
 OUT = -o main.exe
