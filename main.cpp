@@ -17,7 +17,7 @@ public:
     // Deallocates texture.
     void Free();
     //Renders texture at given point.
-    void Render(int x, int y);
+    void Render(int x, int y, SDL_Rect* clip = NULL);
     // Gets image dimensions.
     int GetWidth();
     int GetHeight();
@@ -39,9 +39,9 @@ const int SCREEN_HEIGHT = 480;
 SDL_Window* gWindow = NULL;
 // The window renderer.
 SDL_Renderer* gRenderer = NULL;
-// Scene textures.
-Texture gFooTexture;
-Texture gBackgroundTexture;
+// Scene sprites.
+SDL_Rect gSpriteClips[4];
+Texture gSpriteSheetTexture;
 
 // Starts up SDL and creates window.
 bool init();
@@ -116,11 +116,19 @@ void Texture::Free()
     }
 }
 
-void Texture::Render(int x, int y)
+void Texture::Render(int x, int y, SDL_Rect* clip)
 {
     // Set rendering space and render to screen.
     SDL_Rect renderQuad = {x, y, mWidth, mHeight};
-    SDL_RenderCopy(gRenderer, mTexture, NULL, &renderQuad);
+
+    // Set clip rendering dimensions.
+    if (clip != NULL)
+    {
+        renderQuad.w = clip->w;
+        renderQuad.h = clip->h;
+    }
+
+    SDL_RenderCopy(gRenderer, mTexture, clip, &renderQuad);
 }
 
 int Texture::GetWidth()
@@ -166,10 +174,14 @@ int main(int argc, char* argv[])
                 SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
                 SDL_RenderClear(gRenderer);
 
-                // Render background texture to screen.
-                gBackgroundTexture.Render(0, 0);
-                // Render Foo to the screen.
-                gFooTexture.Render(240, 190);
+                // Render top left sprite.
+                gSpriteSheetTexture.Render(0, 0, &gSpriteClips[0]);
+                // Render top right sprite.
+                gSpriteSheetTexture.Render(SCREEN_WIDTH - gSpriteClips[1].w, 0, &gSpriteClips[1]);
+                // Render top left sprite.
+                gSpriteSheetTexture.Render(0, SCREEN_HEIGHT - gSpriteClips[2].h, &gSpriteClips[2]);
+                // Render top left sprite.
+                gSpriteSheetTexture.Render(SCREEN_WIDTH - gSpriteClips[3].w, SCREEN_HEIGHT - gSpriteClips[3].h, &gSpriteClips[3]);
 
                 // Update screen.
                 SDL_RenderPresent(gRenderer);
@@ -260,18 +272,37 @@ bool loadMedia()
     // Loading success flag.
     bool success = true;
 
-    // Load Foo texture.
-    if (!gFooTexture.LoadFromFile("foo.png"))
+    // Load sprite sheet texture.
+    if (!gSpriteSheetTexture.LoadFromFile("sprites.png"))
     {
-        printf("Failed to load Foo texture image!\n");
+        printf("Failed to load sprite sheet texture!\n");
         success = false;
     }
-
-    // Load background texture.
-    if (!gBackgroundTexture.LoadFromFile("background.png"))
+    else
     {
-        printf("Failed to load background texture image!\n");
-        success = false;
+        // Set top left sprite.
+        gSpriteClips[0].x = 0;
+        gSpriteClips[0].y = 0;
+        gSpriteClips[0].w = 100;
+        gSpriteClips[0].h = 100;
+
+        // Set top right sprite.
+        gSpriteClips[1].x = 100;
+        gSpriteClips[1].y = 0;
+        gSpriteClips[1].w = 100;
+        gSpriteClips[1].h = 100;
+
+        // Set bottom left sprite.
+        gSpriteClips[2].x = 0;
+        gSpriteClips[2].y = 100;
+        gSpriteClips[2].w = 100;
+        gSpriteClips[2].h = 100;
+
+        // Set bottom right sprite.
+        gSpriteClips[3].x = 100;
+        gSpriteClips[3].y = 100;
+        gSpriteClips[3].w = 100;
+        gSpriteClips[3].h = 100;
     }
 
     // Nothing to load.
@@ -281,8 +312,7 @@ bool loadMedia()
 void close()
 {
     // Free loaded image.
-    gFooTexture.Free();
-    gBackgroundTexture.Free();
+    gSpriteSheetTexture.Free();
 
     // Destory window.
     SDL_DestroyRenderer(gRenderer);
