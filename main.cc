@@ -20,7 +20,8 @@ class Texture {
   // Deallocates texture.
   void Free();
   // Renders texture at given point.
-  void Render(int x, int y, SDL_Rect* clip = NULL);
+  void Render(int x, int y, SDL_Rect* clip = NULL, double angle = 0.0,
+              SDL_Point* center = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE);
 
   // Set color modulation.
   void set_color(Uint8 red, Uint8 green, Uint8 blue);
@@ -49,10 +50,8 @@ const int kScreenHeight = 480;
 SDL_Window* window = NULL;
 // The window renderer.
 SDL_Renderer* renderer = NULL;
-// Walking animation.
-const int kWalkingAnimationFrames = 4;
-SDL_Rect sprite_clips[kWalkingAnimationFrames];
-Texture sprite_sheet_texture;
+// The arrow texture.
+Texture arrow_texture;
 
 // Starts up SDL and creates window.
 bool init();
@@ -127,7 +126,8 @@ void Texture::set_color(Uint8 red, Uint8 green, Uint8 blue) {
   SDL_SetTextureColorMod(texture_, red, green, blue);
 }
 
-void Texture::Render(int x, int y, SDL_Rect* clip) {
+void Texture::Render(int x, int y, SDL_Rect* clip, double angle,
+                     SDL_Point* center, SDL_RendererFlip flip) {
   // Set rendering space and render to screen.
   SDL_Rect render_quad = {x, y, width_, height_};
 
@@ -137,7 +137,8 @@ void Texture::Render(int x, int y, SDL_Rect* clip) {
     render_quad.h = clip->h;
   }
 
-  SDL_RenderCopy(renderer, texture_, clip, &render_quad);
+  SDL_RenderCopyEx(renderer, texture_, clip, &render_quad,
+                   angle, center, flip);
 }
 
 void Texture::set_blend_mode(SDL_BlendMode blending) {
@@ -173,8 +174,10 @@ int main(int argc, char* argv[]) {
       // Event handler.
       SDL_Event e;
 
-      // Current animation frame.
-      int frame = 0;
+      // Angle of rotation.
+      double degrees = 0;
+      // Flip type.
+      SDL_RendererFlip flip_type = SDL_FLIP_NONE;
 
       // While application is running.
       while (!quit) {
@@ -183,26 +186,42 @@ int main(int argc, char* argv[]) {
           // User requests quit.
           if (e.type == SDL_QUIT) {
             quit = true;
+          } else if (e.type == SDL_KEYDOWN) {
+            switch (e.key.keysym.sym) {
+              case SDLK_a:
+                degrees -= 60;
+                break;
+
+              case SDLK_d:
+                degrees += 60;
+                break;
+
+              case SDLK_q:
+                flip_type = SDL_FLIP_HORIZONTAL;
+                break;
+
+              case SDLK_w:
+                flip_type = SDL_FLIP_NONE;
+                break;
+
+              case SDLK_e:
+                flip_type = SDL_FLIP_VERTICAL;
+                break;
+            }
           }
         }
 
         // Clear screen.
+        SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
         SDL_RenderClear(renderer);
 
-        // Render current frame.
-        SDL_Rect* current_clip = &sprite_clips[frame / 10];
-        sprite_sheet_texture.Render((kScreenWidth  - current_clip->w) / 2,
-                                    (kScreenHeight - current_clip->h) / 2,
-                                    current_clip);
+        // Render arrow.
+        arrow_texture.Render((kScreenWidth  - arrow_texture.width()) / 2,
+                             (kScreenHeight - arrow_texture.height()) /2,
+                             NULL, degrees, NULL, flip_type);
 
         // Update screen.
         SDL_RenderPresent(renderer);
-
-        // Go to next frame.
-        ++frame;
-
-        // Cycle animation.
-        if (frame / 10 >= kWalkingAnimationFrames) frame = 0;
       }
     }
   }
@@ -285,31 +304,10 @@ bool loadMedia() {
   // Loading success flag.
   bool success = true;
 
-  // Load sprite sheet texture.
-  if (!sprite_sheet_texture.LoadFromFile("foo.png")) {
+  // Load arrow texture.
+  if (!arrow_texture.LoadFromFile("arrow.png")) {
     printf("Failed to load sprite sheet texture!\n");
     success = false;
-  } else {
-    // Set sprite clips.
-    sprite_clips[0].x = 0;
-    sprite_clips[0].y = 0;
-    sprite_clips[0].w = 64;
-    sprite_clips[0].h = 205;
-
-    sprite_clips[1].x = 64;
-    sprite_clips[1].y = 0;
-    sprite_clips[1].w = 64;
-    sprite_clips[1].h = 205;
-
-    sprite_clips[2].x = 128;
-    sprite_clips[2].y = 0;
-    sprite_clips[2].w = 64;
-    sprite_clips[2].h = 205;
-
-    sprite_clips[3].x = 196;
-    sprite_clips[3].y = 0;
-    sprite_clips[3].w = 64;
-    sprite_clips[3].h = 205;
   }
 
   // Nothing to load.
@@ -318,7 +316,7 @@ bool loadMedia() {
 
 void close() {
   // Free loaded image.
-  sprite_sheet_texture.Free();
+  arrow_texture.Free();
 
   // Destory window.
   SDL_DestroyRenderer(renderer);
