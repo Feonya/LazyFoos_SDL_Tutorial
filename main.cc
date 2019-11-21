@@ -49,10 +49,10 @@ const int kScreenHeight = 480;
 SDL_Window* window = NULL;
 // The window renderer.
 SDL_Renderer* renderer = NULL;
-// The texture for modulation.
-Texture modulated_texture;
-// The background texture.
-Texture background_texture;
+// Walking animation.
+const int kWalkingAnimationFrames = 4;
+SDL_Rect sprite_clips[kWalkingAnimationFrames];
+Texture sprite_sheet_texture;
 
 // Starts up SDL and creates window.
 bool init();
@@ -173,8 +173,8 @@ int main(int argc, char* argv[]) {
       // Event handler.
       SDL_Event e;
 
-      // Modulation component.
-      Uint8 a = 255;
+      // Current animation frame.
+      int frame = 0;
 
       // While application is running.
       while (!quit) {
@@ -183,37 +183,26 @@ int main(int argc, char* argv[]) {
           // User requests quit.
           if (e.type == SDL_QUIT) {
             quit = true;
-          // On keypress change rgb values.
-          } else if (e.type == SDL_KEYDOWN) {
-            // Increase alpha on w.
-            if (e.key.keysym.sym == SDLK_w) {
-              // Cap if over 255.
-              if (a + 32 > 255) a  = 255;
-              // Increment otherwise.
-              else              a += 32;
-            // Decrease alpha on s.
-            } else if (e.key.keysym.sym == SDLK_s) {
-              // Cap if below 0.
-              if (a - 32 < 0) a  = 0;
-              // Decrement otherwise.
-              else            a -= 32;
-            }
           }
         }
 
         // Clear screen.
-        SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
         SDL_RenderClear(renderer);
 
-        // Render background texture.
-        background_texture.Render(0, 0);
-
-        // Render front texture.
-        modulated_texture.set_alpha(a);
-        modulated_texture.Render(0, 0);
+        // Render current frame.
+        SDL_Rect* current_clip = &sprite_clips[frame / 10];
+        sprite_sheet_texture.Render((kScreenWidth  - current_clip->w) / 2,
+                                    (kScreenHeight - current_clip->h) / 2,
+                                    current_clip);
 
         // Update screen.
         SDL_RenderPresent(renderer);
+
+        // Go to next frame.
+        ++frame;
+
+        // Cycle animation.
+        if (frame / 10 >= kWalkingAnimationFrames) frame = 0;
       }
     }
   }
@@ -243,8 +232,10 @@ bool init() {
       printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
       success = false;
     } else {
-      // Create renderer to window.
-      renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+      // Create vsynced renderer for window.
+      renderer = SDL_CreateRenderer(window, -1,
+                                    SDL_RENDERER_ACCELERATED |
+                                    SDL_RENDERER_PRESENTVSYNC);
       if (renderer == NULL) {
         printf("Renderer could not be created! SDL_Error: %s\n",
                SDL_GetError());
@@ -294,19 +285,31 @@ bool loadMedia() {
   // Loading success flag.
   bool success = true;
 
-  // Load front alpha texture.
-  if (!modulated_texture.LoadFromFile("fadeout.png")) {
-    printf("Failed to load front texture!\n");
+  // Load sprite sheet texture.
+  if (!sprite_sheet_texture.LoadFromFile("foo.png")) {
+    printf("Failed to load sprite sheet texture!\n");
     success = false;
   } else {
-    // Set standard alpha blending.
-    modulated_texture.set_blend_mode(SDL_BLENDMODE_BLEND);
-  }
+    // Set sprite clips.
+    sprite_clips[0].x = 0;
+    sprite_clips[0].y = 0;
+    sprite_clips[0].w = 64;
+    sprite_clips[0].h = 205;
 
-  // Load background texture.
-  if (!background_texture.LoadFromFile("fadein.png")) {
-    printf("Failed to load background texture!\n");
-    success = false;
+    sprite_clips[1].x = 64;
+    sprite_clips[1].y = 0;
+    sprite_clips[1].w = 64;
+    sprite_clips[1].h = 205;
+
+    sprite_clips[2].x = 128;
+    sprite_clips[2].y = 0;
+    sprite_clips[2].w = 64;
+    sprite_clips[2].h = 205;
+
+    sprite_clips[3].x = 196;
+    sprite_clips[3].y = 0;
+    sprite_clips[3].w = 64;
+    sprite_clips[3].h = 205;
   }
 
   // Nothing to load.
@@ -315,7 +318,7 @@ bool loadMedia() {
 
 void close() {
   // Free loaded image.
-  modulated_texture.Free();
+  sprite_sheet_texture.Free();
 
   // Destory window.
   SDL_DestroyRenderer(renderer);
