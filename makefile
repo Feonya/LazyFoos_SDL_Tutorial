@@ -6,7 +6,7 @@ LIB_DIR = -L"./lib"
 CFLAG = -g -Wall -Wl,-subsystem,console
 LFLAG = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image
 
-SRC = main.cpp
+SRC = main.cc
 OUT = -o main.exe
 
 all : $(SRC)
