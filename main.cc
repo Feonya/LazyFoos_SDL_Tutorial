@@ -24,6 +24,10 @@ class Texture {
 
   // Set color modulation.
   void set_color(Uint8 red, Uint8 green, Uint8 blue);
+  // Set blending.
+  void set_blend_mode(SDL_BlendMode blending);
+  // Set alpha modulation.
+  void set_alpha(Uint8 alpha);
   // Gets image dimensions.
   int width();
   int height();
@@ -47,6 +51,8 @@ SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 // The texture for modulation.
 Texture modulated_texture;
+// The background texture.
+Texture background_texture;
 
 // Starts up SDL and creates window.
 bool init();
@@ -134,6 +140,16 @@ void Texture::Render(int x, int y, SDL_Rect* clip) {
   SDL_RenderCopy(renderer, texture_, clip, &render_quad);
 }
 
+void Texture::set_blend_mode(SDL_BlendMode blending) {
+  // Set blending function.
+  SDL_SetTextureBlendMode(texture_, blending);
+}
+
+void Texture::set_alpha(Uint8 alpha) {
+  // Modulate texture alpha.
+  SDL_SetTextureAlphaMod(texture_, alpha);
+}
+
 int Texture::width() {
   return width_;
 }
@@ -157,10 +173,8 @@ int main(int argc, char* argv[]) {
       // Event handler.
       SDL_Event e;
 
-      // Modulation components.
-      Uint8 r = 255;
-      Uint8 g = 255;
-      Uint8 b = 255;
+      // Modulation component.
+      Uint8 a = 255;
 
       // While application is running.
       while (!quit) {
@@ -171,25 +185,18 @@ int main(int argc, char* argv[]) {
             quit = true;
           // On keypress change rgb values.
           } else if (e.type == SDL_KEYDOWN) {
-            switch (e.key.keysym.sym) {
-              case SDLK_q:
-                r += 32;
-                break;
-              case SDLK_w:
-                g += 32;
-                break;
-              case SDLK_e:
-                b += 32;
-                break;
-              case SDLK_a:
-                r -= 32;
-                break;
-              case SDLK_s:
-                r -= 32;
-                break;
-              case SDLK_d:
-                r -= 32;
-                break;
+            // Increase alpha on w.
+            if (e.key.keysym.sym == SDLK_w) {
+              // Cap if over 255.
+              if (a + 32 > 255) a  = 255;
+              // Increment otherwise.
+              else              a += 32;
+            // Decrease alpha on s.
+            } else if (e.key.keysym.sym == SDLK_s) {
+              // Cap if below 0.
+              if (a - 32 < 0) a  = 0;
+              // Decrement otherwise.
+              else            a -= 32;
             }
           }
         }
@@ -198,8 +205,11 @@ int main(int argc, char* argv[]) {
         SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
         SDL_RenderClear(renderer);
 
-        // Modulate and render texture.
-        modulated_texture.set_color(r, g, b);
+        // Render background texture.
+        background_texture.Render(0, 0);
+
+        // Render front texture.
+        modulated_texture.set_alpha(a);
         modulated_texture.Render(0, 0);
 
         // Update screen.
@@ -284,9 +294,18 @@ bool loadMedia() {
   // Loading success flag.
   bool success = true;
 
-  // Load sprite sheet texture.
-  if (!modulated_texture.LoadFromFile("colors.png")) {
-    printf("Failed to load sprite sheet texture!\n");
+  // Load front alpha texture.
+  if (!modulated_texture.LoadFromFile("fadeout.png")) {
+    printf("Failed to load front texture!\n");
+    success = false;
+  } else {
+    // Set standard alpha blending.
+    modulated_texture.set_blend_mode(SDL_BLENDMODE_BLEND);
+  }
+
+  // Load background texture.
+  if (!background_texture.LoadFromFile("fadein.png")) {
+    printf("Failed to load background texture!\n");
     success = false;
   }
 
