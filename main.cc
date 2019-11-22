@@ -1,11 +1,11 @@
 // Copyright 2019 Tuxyin.
 
 #include <cstdio>
-
 #include <string>
 
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
+#include "SDL2/SDL_ttf.h"
 
 // Texture wrapper class.
 class Texture {
@@ -17,6 +17,8 @@ class Texture {
 
   // Loads image at specified path.
   bool LoadFromFile(std::string path);
+  // Creates image from font string.
+  bool LoadFromRenderedText(std::string texture_text, SDL_Color text_color);
   // Deallocates texture.
   void Free();
   // Renders texture at given point.
@@ -50,8 +52,10 @@ const int kScreenHeight = 480;
 SDL_Window* window = NULL;
 // The window renderer.
 SDL_Renderer* renderer = NULL;
-// The arrow texture.
-Texture arrow_texture;
+// Globally used font.
+TTF_Font* font = NULL;
+// Rendered texture.
+Texture text_texture;
 
 // Starts up SDL and creates window.
 bool init();
@@ -108,6 +112,37 @@ bool Texture::LoadFromFile(std::string path) {
 
   // Return success.
   texture_ = new_texture;
+  return texture_ != NULL;
+}
+
+bool Texture::LoadFromRenderedText(std::string texture_text,
+                                   SDL_Color text_color) {
+  // Get rid of preexisting texture.
+  Free();
+
+  // Render text surface.
+  SDL_Surface* text_surface = TTF_RenderText_Solid(font, texture_text.c_str(),
+                                                  text_color);
+  if (text_surface == NULL) {
+    printf("Unable to render text surface! SDL_ttf_Error: %s\n",
+           TTF_GetError());
+  } else {
+    // Create texture from surface pixels.
+    texture_ = SDL_CreateTextureFromSurface(renderer, text_surface);
+    if (texture_ == NULL) {
+      printf("Unable to create texture from rendered text! SDL_Error: %s\n",
+             SDL_GetError());
+    } else {
+      // Get image dimensions.
+      width_  = text_surface->w;
+      height_ = text_surface->h;
+    }
+
+    // Get rid of old surface.
+    SDL_FreeSurface(text_surface);
+  }
+
+  // return success.
   return texture_ != NULL;
 }
 
@@ -174,11 +209,6 @@ int main(int argc, char* argv[]) {
       // Event handler.
       SDL_Event e;
 
-      // Angle of rotation.
-      double degrees = 0;
-      // Flip type.
-      SDL_RendererFlip flip_type = SDL_FLIP_NONE;
-
       // While application is running.
       while (!quit) {
         // Handle events on queue.
@@ -186,28 +216,6 @@ int main(int argc, char* argv[]) {
           // User requests quit.
           if (e.type == SDL_QUIT) {
             quit = true;
-          } else if (e.type == SDL_KEYDOWN) {
-            switch (e.key.keysym.sym) {
-              case SDLK_a:
-                degrees -= 60;
-                break;
-
-              case SDLK_d:
-                degrees += 60;
-                break;
-
-              case SDLK_q:
-                flip_type = SDL_FLIP_HORIZONTAL;
-                break;
-
-              case SDLK_w:
-                flip_type = SDL_FLIP_NONE;
-                break;
-
-              case SDLK_e:
-                flip_type = SDL_FLIP_VERTICAL;
-                break;
-            }
           }
         }
 
@@ -215,10 +223,9 @@ int main(int argc, char* argv[]) {
         SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
         SDL_RenderClear(renderer);
 
-        // Render arrow.
-        arrow_texture.Render((kScreenWidth  - arrow_texture.width()) / 2,
-                             (kScreenHeight - arrow_texture.height()) /2,
-                             NULL, degrees, NULL, flip_type);
+        // Render current frame.
+        text_texture.Render((kScreenWidth  - text_texture.width())  / 2,
+                            (kScreenHeight - text_texture.height()) / 2);
 
         // Update screen.
         SDL_RenderPresent(renderer);
@@ -270,6 +277,13 @@ bool init() {
                  IMG_GetError());
           success = false;
         }
+
+        // Initialize SDL_ttf.
+        if (TTF_Init() == -1) {
+          printf("SDL_ttf could not initialize! SDL_ttf_Error: %s\n",
+                 TTF_GetError());
+          success = false;
+        }
       }
     }
   }
@@ -304,10 +318,19 @@ bool loadMedia() {
   // Loading success flag.
   bool success = true;
 
-  // Load arrow texture.
-  if (!arrow_texture.LoadFromFile("arrow.png")) {
-    printf("Failed to load sprite sheet texture!\n");
+  // Open the font.
+  font = TTF_OpenFont("Gabriola.ttf", 28);
+  if (font == NULL) {
+    printf("Failed to load font! SDL_ttf_Error: %s\n", TTF_GetError());
     success = false;
+  } else {
+    // Render text.
+    SDL_Color text_color = {0, 0, 0};
+    if (!text_texture.LoadFromRenderedText("This is the test Text",
+                                           text_color)) {
+      printf("Failed to render text texture!\n");
+      success = false;
+    }
   }
 
   // Nothing to load.
@@ -316,7 +339,11 @@ bool loadMedia() {
 
 void close() {
   // Free loaded image.
-  arrow_texture.Free();
+  text_texture.Free();
+
+  // Free global font.
+  TTF_CloseFont(font);
+  font = NULL;
 
   // Destory window.
   SDL_DestroyRenderer(renderer);
@@ -325,6 +352,7 @@ void close() {
   renderer = NULL;
 
   // Quit SDL subsystem.
+  TTF_Quit();
   IMG_Quit();
   SDL_Quit();
 }
