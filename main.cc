@@ -79,8 +79,8 @@ class Button {
 };
 
 // Button constants.
-const int kButtonWidth  = 100;
-const int kButtonHeight = 100;
+const int kButtonWidth  = 320;
+const int kButtonHeight = 240;
 const int kTotalButtons = 4;
 // Screen dimension constants.
 const int kScreenWidth  = 640;
@@ -118,6 +118,12 @@ int main(int argc, char* argv[]) {
 
       // Event handler.
       SDL_Event e;
+
+      // Set buttons position.
+      buttons[0].set_position(0, 0);
+      buttons[1].set_position(0, kScreenHeight / 2);
+      buttons[2].set_position(kScreenWidth / 2, 0);
+      buttons[3].set_position(kScreenWidth / 2, kScreenHeight / 2);
 
       // While application is running.
       while (!quit) {
@@ -233,14 +239,7 @@ bool loadMedia() {
   bool success = true;
 
   // Loads button sprites.
-  SDL_Surface* loadedSurface = IMG_Load("button_sprites.png");
-  if (loadedSurface == NULL) {
-    printf("Failed to load botton sprites!\n");
-    success = false;
-  }
-
-  // Deallocate loadedSurface.
-  SDL_FreeSurface(loadedSurface);
+  button_sprite_sheet_texture.LoadFromFile("button_sprites.png");
 
   // Initialize sprite clips.
   sprite_clips[0] = {0, 0, kButtonWidth, kButtonHeight};
