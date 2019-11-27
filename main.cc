@@ -1,100 +1,215 @@
-// Copyright 2019 Tuxyin.
+/// Copyright 2019 Tuxyin.
 
-#include "./texture.h"
+#include <string>
+
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_image.h"
+#include "SDL2/SDL_mixer.h"
+
+SDL_Window*   window   = NULL;
+SDL_Renderer* renderer = NULL;
+SDL_Texture*  texture  = NULL;
+
+// The music that will be played.
+Mix_Music* music   = NULL;
+// The sound effects that will be used.
+Mix_Chunk* kiss    = NULL;
+Mix_Chunk* dog     = NULL;
+Mix_Chunk* coin    = NULL;
+Mix_Chunk* oh_yeah = NULL;
 
 bool init();
+bool loadMedia();
 void close();
-
-SDL_Window*   window          = NULL;
-SDL_Renderer* renderer        = NULL;
-Texture*      current_texture = NULL;
-Texture       textures[5];
 
 int main(int argc, char* argv[]) {
   bool quit = false;
 
-  if (!init()) {
-    printf("Failed to init SDL!\n");
+  if (init() == false) {
+    printf("Initialize SDL unsuccessful!\n");
+    quit = true;
+  }
+
+  if (loadMedia() == false) {
+    printf("Load media unsuccessfull!\n");
     quit = true;
   }
 
   SDL_Event e;
 
-  textures[0].LoadFromFile(renderer, "up.png");
-  textures[1].LoadFromFile(renderer, "down.png");
-  textures[2].LoadFromFile(renderer, "left.png");
-  textures[3].LoadFromFile(renderer, "right.png");
-  textures[4].LoadFromFile(renderer, "default.png");
-
   while (!quit) {
-    while (SDL_PollEvent(&e) != 0) {
-      if (e.type == SDL_QUIT)
+    while (SDL_PollEvent(&e)) {
+      if (e.type == SDL_QUIT) {
         quit = true;
+      // Handle key press.
+      } else if (e.type == SDL_KEYDOWN) {
+        switch (e.key.keysym.sym) {
+          // Play sound effects.
+          case SDLK_1:
+            Mix_PlayChannel(-1, kiss, 0);
+            break;
+          case SDLK_2:
+            Mix_PlayChannel(-1, dog, 0);
+            break;
+          case SDLK_3:
+            Mix_PlayChannel(-1, coin, 0);
+            break;
+          case SDLK_4:
+            Mix_PlayChannel(-1, oh_yeah, 0);
+            break;
+
+          // Start, pause or resume play music.
+          case SDLK_9:
+            // If there is no music playing.
+            if (Mix_PlayingMusic() == 0) {
+              // Play the music.
+              Mix_PlayMusic(music, 0);
+            // If music is being paused.
+            } else {
+              // If the music is paused.
+              if (Mix_PausedMusic() == 1) {
+                // Resume the music.
+                Mix_ResumeMusic();
+              // If the music is playing.
+              } else {
+                // Pause the music.
+                Mix_PauseMusic();
+              }
+            }
+            break;
+
+          // Stop music.
+          case SDLK_0:
+            Mix_HaltMusic();
+            break;
+        }
+      }
     }
 
-    // Set texture based on current keystate.
-    const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
-    if (currentKeyStates[SDL_SCANCODE_UP]) {
-      current_texture = &textures[0];
-    } else if (currentKeyStates[SDL_SCANCODE_DOWN]) {
-      current_texture = &textures[1];
-    } else if (currentKeyStates[SDL_SCANCODE_LEFT]) {
-      current_texture = &textures[2];
-    } else if (currentKeyStates[SDL_SCANCODE_RIGHT]) {
-      current_texture = &textures[3];
-    } else {
-      current_texture = &textures[4];
-    }
-
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    // Render texture.
     SDL_RenderClear(renderer);
-
-    current_texture->Render(renderer);
-
+    SDL_RenderCopy(renderer, texture, 0, 0);
     SDL_RenderPresent(renderer);
   }
 
   close();
-
   return 0;
 }
 
 bool init() {
-  bool success = true;
-
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-    printf("Failed to Init SDL! SDL Error: %s\n", SDL_GetError());
-    success = false;
-  } else {
-    window = SDL_CreateWindow("SDL Tutorial",
-        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        640, 480, SDL_WINDOW_SHOWN);
-    if (window == NULL) {
-      printf("Failed to create window! SDL Error: %s\n", SDL_GetError());
-      success = false;
-    } else {
-      renderer = SDL_CreateRenderer(window, -1,
-          SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-      if (renderer == NULL) {
-        printf("Failed to create renderer! SDL Error: %s\n", SDL_GetError());
-        success = false;
-      }
-    }
+  // Initialize SDL subsystems.
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
+    printf("Failed to initialize SDL: %s\n", SDL_GetError());
+    return false;
   }
 
+  // Create SDL window.
+  window = SDL_CreateWindow("Lazy Foo's SDL Tutorial",
+                            SDL_WINDOWPOS_UNDEFINED,
+                            SDL_WINDOWPOS_UNDEFINED,
+                            800, 640,
+                            SDL_WINDOW_SHOWN);
+  if (window == NULL) {
+    printf("Faile to create SDL window: %s\n", SDL_GetError());
+    return false;
+  }
+
+  // Create SDL renderer.
+  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+  if (renderer == NULL) {
+    printf("Failed to create SDL renderer: %s\n", SDL_GetError());
+    return false;
+  }
+
+  // Initialize PNG loading.
   if ((IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) != IMG_INIT_PNG) {
-    printf("Failed to init SDL_image! SDL_image Error: %s\n", IMG_GetError());
-    success = false;
+    printf("Failed to initialize SDL image: %s\n", IMG_GetError());
+    return false;
   }
 
-  return success;
+  // Initialize Audio loading.
+  if ((Mix_Init(MIX_INIT_MP3) & MIX_INIT_MP3) != MIX_INIT_MP3) {
+    printf("Failed to initialize SDL mix: %s\n", Mix_GetError());
+    return false;
+  }
+
+  // Initialize the mixer API.
+  if (Mix_OpenAudio(44100, AUDIO_S16SYS, 2, 1024) == -1) {
+    printf("Failed to open audio from SDL mix: %s\n", Mix_GetError());
+    return false;
+  }
+
+  // Everything is OK.
+  return  true;
+}
+
+bool loadMedia() {
+  // Load texture.
+  SDL_Surface* surf = IMG_Load("assets/bg.png");
+  texture = SDL_CreateTextureFromSurface(renderer, surf);
+  if (texture == NULL) {
+    printf("Failed to load texture: %s\n", SDL_GetError());
+    return false;
+  }
+  SDL_FreeSurface(surf);
+
+  // Load music.
+  music = Mix_LoadMUS("assets/music.mp3");
+  if (music == NULL) {
+    printf("Failed to load music: %s\n", Mix_GetError());
+    return false;
+  }
+
+  // Load sound effects.
+  kiss = Mix_LoadWAV("assets/kiss.wav");
+  if (kiss == NULL) {
+    printf("Failed to load sound kiss: %s\n", Mix_GetError());
+    return false;
+  }
+
+  dog = Mix_LoadWAV("assets/dog.wav");
+  if (dog == NULL) {
+    printf("Failed to load sound dog: %s\n", Mix_GetError());
+    return false;
+  }
+
+  coin = Mix_LoadWAV("assets/coin.wav");
+  if (coin == NULL) {
+    printf("Failed to load sound coin: %s\n", Mix_GetError());
+    return false;
+  }
+
+  oh_yeah = Mix_LoadWAV("assets/oh_yeah.wav");
+  if (oh_yeah == NULL) {
+    printf("Failed to load sound oh_yeah: %s\n", Mix_GetError());
+    return false;
+  }
+
+  // Everything is OK.
+  return true;
 }
 
 void close() {
-  SDL_DestroyRenderer(renderer);
-  renderer = NULL;
-  SDL_DestroyWindow(window);
-  window = NULL;
+  SDL_DestroyTexture(texture);
+  texture = NULL;
 
+  Mix_FreeMusic(music);
+  Mix_FreeChunk(kiss);
+  Mix_FreeChunk(dog);
+  Mix_FreeChunk(coin);
+  Mix_FreeChunk(oh_yeah);
+  music   = NULL;
+  kiss    = NULL;
+  dog     = NULL;
+  coin    = NULL;
+  oh_yeah = NULL;
+
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  renderer = NULL;
+  window   = NULL;
+
+  Mix_Quit();
+  IMG_Quit();
   SDL_Quit();
 }
