@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
   textures[0].LoadFromFile(renderer, "up.png");
   textures[1].LoadFromFile(renderer, "down.png");
   textures[2].LoadFromFile(renderer, "left.png");
-  textures[3].LoadFromFile(renderer, "down.png");
+  textures[3].LoadFromFile(renderer, "right.png");
   textures[4].LoadFromFile(renderer, "default.png");
 
   while (!quit) {
