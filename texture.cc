@@ -10,7 +10,7 @@ bool Texture::LoadFromRenderedText(SDL_Renderer* renderer, TTF_Font* font,
     SDL_Surface* surf = TTF_RenderUTF8_Blended(font, text.c_str(), color);
     if (surf == NULL) return false;
 
-    if (texture_ == NULL) SDL_DestroyTexture(texture_);
+    if (texture_ != NULL) SDL_DestroyTexture(texture_);
     texture_ = SDL_CreateTextureFromSurface(renderer, surf);
     if (texture_ == NULL) return false;
     width_  = surf->w;
