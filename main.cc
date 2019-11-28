@@ -1,179 +1,152 @@
-#include <string>
+#include <iostream>
 #include <sstream>
+#include <string>
 
-#include "SDL2/SDL.h"
-#include "SDL2/SDL_ttf.h"
+#include "timer.h"
+#include "texture.h"
 
-SDL_Window*   window         = NULL;
-SDL_Renderer* renderer       = NULL;
-SDL_Texture*  prompt_texture = NULL;
-SDL_Texture*  text_texture   = NULL;
-TTF_Font*     font           = NULL;
+int g_screenWidth  = 600;
+int g_screenHeight = 480;
+
+SDL_Window*   g_window        = NULL;
+SDL_Renderer* g_renderer      = NULL;
+TTF_Font*     g_font          = NULL;
+Texture*      g_promptTexture1 = NULL;
+Texture*      g_promptTexture2 = NULL;
 
 bool init();
-bool load_media();
+bool loadMedia();
 void close();
-SDL_Texture* create_texture_from_text(std::string text, SDL_Color color);
 
 int main(int argc, char* argv[])
 {
-  bool quit = false;
+    // The main loop flag.
+    bool quit = false;
 
-  if (init() == false)       quit = true;
-  if (load_media() == false) quit = true;
-
-  SDL_Event e;
-
-  // Current time start time.
-  Uint32 start_time = 0;
-  // In memory text stream.
-  std::stringstream time_text;
-  // Text color.
-  SDL_Color color = {0, 0, 0, 255};
-
-  // Text rectangles.
-  SDL_Rect prompt_rect;
-  SDL_Rect text_rect;
-  // Text texture width and height.
-  int prompt_w = 0;
-  int prompt_h = 0;
-  int text_w   = 0;
-  int text_h   = 0;
-
-  // Get prompt texture width and height.
-  SDL_QueryTexture(prompt_texture, NULL, NULL, &prompt_w, &prompt_h);
-  // Set prompt rect.
-  prompt_rect = {0, 0, prompt_w, prompt_h};
-
-  while (!quit)
-  {
-    while (SDL_PollEvent(&e))
+    if (init() == false)
     {
-      if (e.type == SDL_QUIT) quit = true;
-
-      // Reset start time on return keypress.
-      else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_RETURN)
-        start_time = SDL_GetTicks();
+        quit = true;
+        std::cout << "Initialize SDL Error: " << SDL_GetError() << "\n";
     }
 
-    // Set text to be rendered.
-    time_text.str("");
-    time_text << "Milliseconds since start time "
-              << SDL_GetTicks() - start_time;
-
-    // Start Rendering text.
-    // Free text_texture's memory first.
-    SDL_DestroyTexture(text_texture);
-    // Then create texture from time text.
-    text_texture = create_texture_from_text(time_text.str(), color);
-    if (text_texture == NULL)
+    if (loadMedia() == false)
     {
-      printf("Failed to create time text texture: %s\n", SDL_GetError());
-      quit = true;
+        quit = true;
+        std::cout << "Load media Error: " << SDL_GetError() << "\n";
     }
 
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-    SDL_RenderClear(renderer);
+    // SDL event handler.
+    SDL_Event e;
+    // The text color;
+    SDL_Color textColor = {0, 0, 0, 255};
+    // The text stream in memory.
+    std::stringstream timeText;
+    // The Application timer.
+    Timer timer;
+    // The time texture.
+    Texture timeTexture;
 
-    SDL_RenderCopy(renderer, prompt_texture, 0, &prompt_rect);
+    // The main loop.
+    while (!quit)
+    {
+        while (SDL_PollEvent(&e) != 0)
+        {
+            if (e.type == SDL_QUIT) quit = true;
+            else if (e.type == SDL_KEYDOWN)
+            {
+                // Start/Stop.
+                if (e.key.keysym.sym == SDLK_s)
+                {
+                    if (timer.IsStarted()) timer.Stop();
+                    else                   timer.Start();
+                }
+                // Pause/Unpause.
+                else if (e.key.keysym.sym == SDLK_p)
+                {
+                    if (timer.IsPaused()) timer.Unpause();
+                    else                  timer.Pause();
+                }
+            }
+        }
 
-    // Get text texture width and height.
-    SDL_QueryTexture(text_texture, NULL, NULL, &text_w, &text_h);
-    // Set text rect.
-    text_rect = {0, 240, text_w, text_h};
-    SDL_RenderCopy(renderer, text_texture, 0, &text_rect);
+        // Set text to be rendered.
+        timeText.str("");
+        timeText << "Seconds since start time " << timer.GetTicks() / 1000.f;
+        // Render and load text.
+        timeTexture.Free();
+        if (!timeTexture.LoadFromRenderedText(g_renderer, g_font, timeText.str(), textColor))
+            std::cout << "Unable to render time texture!\n";
+        // Clear screen.
+        SDL_SetRenderDrawColor(g_renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+        SDL_RenderClear(g_renderer);
+        // Render texture.
+        g_promptTexture1->Render(g_renderer, 0, 0);
+        g_promptTexture2->Render(g_renderer, 0, 28);
+        timeTexture.Render(g_renderer, 0, g_screenHeight / 2);
+        // Update screen.
+        SDL_RenderPresent(g_renderer);
+    }
 
-    SDL_RenderPresent(renderer);
-  }
-
-  close();
-  return 0;
+    close();
+    return 0;
 }
 
 bool init()
 {
-  // Initialize SDL subsystem.
-  if (SDL_Init(SDL_INIT_VIDEO) != 0)
-  {
-    printf("Failed to initialize SDL: %s\n", SDL_GetError());
-    return false;
-  }
+    // Initialize SDL subsystem.
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) return false;
 
-  // Create SDL window.
-  window = SDL_CreateWindow("Lazy Foo's SDL Tutorial",
-                            SDL_WINDOWPOS_UNDEFINED,
-                            SDL_WINDOWPOS_UNDEFINED,
-                            640, 480, SDL_WINDOW_SHOWN);
-  if (window == NULL)
-  {
-    printf("Failed to create window: %s\n", SDL_GetError());
-    return false;
-  }
-  
-  // Create SDL renderer.
-  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-  if (renderer == NULL)
-  {
-    printf("Failed to create renderer: %s\n", SDL_GetError());
-    return false;
-  }
+    // Create SDL window.
+    g_window = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                              g_screenWidth, g_screenHeight, SDL_WINDOW_SHOWN);
+    if (g_window == NULL) return false;
 
-  // Initialize SDl ttf.
-  if (TTF_Init() == -1)
-  {
-    printf("Failed to initalize SDL ttf: %s\n", TTF_GetError());
-    return false;
-  }
+    // Create SDL renderer.
+    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
+    if (g_renderer == NULL) return false;
 
-  return true;
+    // Initialize SDL ttf.
+    if (TTF_Init() == -1) return false;
+
+    // Everthing is OK.
+    return true;
 }
 
-bool load_media()
+bool loadMedia()
 {
-  // Load the font.
-  font = TTF_OpenFont("comic.ttf", 28);
-  if (font == NULL)
-  {
-    printf("Failed to load comic font: %s\n", TTF_GetError());
-    return false;
-  }
+    // Load font.
+    g_font = TTF_OpenFont("Gabriola.ttf", 28);
+    if (g_font == NULL) return false;
 
-  // create texture from given text.
-  SDL_Color color = {0, 0, 0, 255};
-  prompt_texture = create_texture_from_text("Press Enter to Reset Start Time.",
-                                            color);
-  if (prompt_texture == NULL)
-  {
-    printf("Failed to create prompt text texture: %s\n", SDL_GetError());
-    return false;
-  }
+    // Load prompt texture.
+    SDL_Color color = {0, 0, 0, 255};
+    g_promptTexture1 = new Texture();
+    g_promptTexture2 = new Texture();
+    if (!g_promptTexture1->LoadFromRenderedText(g_renderer, g_font,
+                                               "Press S to Start or Stop the Timer",
+                                               color)) return false;
+    if (!g_promptTexture2->LoadFromRenderedText(g_renderer, g_font,
+                                               "Press P to Pause or Unpause the Timer",
+                                               color)) return false;
 
-  return true;
-}
-
-SDL_Texture* create_texture_from_text(std::string text, SDL_Color color)
-{
-  SDL_Surface* surf = TTF_RenderText_Solid(font, text.c_str(), color);
-  SDL_Texture* texture;
-  texture = SDL_CreateTextureFromSurface(renderer, surf);
-  SDL_FreeSurface(surf);
-
-  return texture;
+    // Everthing is OK.
+    return true;
 }
 
 void close()
 {
-  TTF_CloseFont(font);
-  SDL_DestroyTexture(prompt_texture);
-  SDL_DestroyTexture(text_texture);
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-  font           = NULL;
-  prompt_texture = NULL;
-  text_texture   = NULL;
-  renderer       = NULL;
-  window         = NULL;
-  
-  TTF_Quit();
-  SDL_Quit();
+    g_promptTexture1->Free();
+    g_promptTexture2->Free();
+    SDL_DestroyRenderer(g_renderer);
+    SDL_DestroyWindow(g_window);
+    TTF_CloseFont(g_font);
+
+    g_promptTexture1 = NULL;
+    g_promptTexture2 = NULL;
+    g_renderer       = NULL;
+    g_window         = NULL;
+    g_font           = NULL;
+
+    TTF_Quit();
+    SDL_Quit();
 }
